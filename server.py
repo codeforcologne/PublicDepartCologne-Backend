@@ -5,8 +5,8 @@ import urllib.request
 from bs4 import BeautifulSoup
 from io import StringIO
 import psycopg2
-from ast import literal_eval
 import geojson
+import configparser
 
 app = flask.Flask(__name__)
 
@@ -137,8 +137,16 @@ def database():
     else:
         # print("Test")
         try:
-            connect_str = "dbname='hackcity' user='postgres' host='localhost' " + \
-                          "password='Super3!'"
+            config = configparser.ConfigParser()
+            config.read("config.ini")
+            host = config.get("postgres", "host")
+            db = config.get("postgres", "db")
+            user = config.get("postgres", "user")
+            password = config.get("postgres", "password")
+
+
+            connect_str = "dbname='" + db + "' user='" + user + "' host='" + host + "' " + \
+                          "password='" + password + "'"
             # use our connection values to establish a connection
             conn = psycopg2.connect(connect_str)
             # create a psycopg2 cursor that can execute queries
