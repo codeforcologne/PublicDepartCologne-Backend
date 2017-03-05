@@ -231,5 +231,5 @@ def shutdown():
 
 if __name__ == "__main__":
     # For Public use
-    app.run(host='192.168.199.142')
-    # app.run()
+    # app.run(host='192.168.199.142')
+    app.run()
