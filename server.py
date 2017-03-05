@@ -11,7 +11,7 @@ import geojson
 app = flask.Flask(__name__)
 
 
-def getdata(code):
+def getdata(code, limit):
     data_url = "http://www.kvb-koeln.de/generated/?aktion=show&code=" + str(code) + "&title=graph"
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 '
@@ -55,21 +55,24 @@ def getdata(code):
 
     table = soup.findAll("table")[1]
 
-    print(table)
+    # print(table)
 
     data = []
 
     for row in table.findAll("tr"):
-        print(row)
+        # print(row)
         item = {}
         cols = row.findAll("td")
         if len(cols) >= 3:
             item['id'] = str(unicodedata.normalize('NFKD', cols[0].getText())).strip()
             item['haltestelle'] = str(unicodedata.normalize('NFKD', cols[1].getText())).replace(" ", "")
-            item['abfahrt'] = str(unicodedata.normalize('NFKD', cols[2].getText())).strip()
+            item['abfahrt'] = str(unicodedata.normalize('NFKD', cols[2].getText())).strip().replace(" Min", "")
             data.append(item)
 
-    return data
+    if limit is not None:
+        return data[0:int(limit)]
+    else:
+        return data
 
 
 def shutdown_server():
@@ -126,13 +129,13 @@ def home():
 def database():
     lat = flask.request.args.get('lat', default=None)
     long = flask.request.args.get('long', default=None)
-    #radius = flask.request.args.get('radius', default=None)
+    # radius = flask.request.args.get('radius', default=None)
 
     if lat is None or long is None:
         return flask.render_template("error.html", error_title="No Lat or long",
                                      error="Bitte gib die Parameter ?lat und &long an")
     else:
-        print("Test")
+        # print("Test")
         try:
             connect_str = "dbname='hackcity' user='postgres' host='localhost' " + \
                           "password='Super3!'"
@@ -144,7 +147,7 @@ def database():
             # ST_Distance(haltestellen.geom, ST_MakePoint(""" + lat + """, """ + long + """)::geography) as distance
 
             cursor.execute((
-                               """SELECT *, ST_Distance(haltestellen.geom, ST_MakePoint(<lat>, <long>)::geography) as distance, st_asgeojson(geom) FROM public.haltestellen ORDER BY distance LIMIT 5; """).replace(
+                               """SELECT *, ST_Distance(haltestellen.geom, ST_MakePoint(<long>, <lat>)::geography) as distance, st_asgeojson(geom) FROM public.haltestellen ORDER BY distance LIMIT 5; """).replace(
                 "<lat>", lat).replace("<long>", long))
             # cursor.execute("""SELECT * FROM public.haltestellen WHERE ST_DWithin(haltestellen.geom, ST_MakePoint(6.9881160312996728, 50.96659064159747)::geography, 10000);""")
             # create a new table with a single column called "name"
@@ -162,7 +165,7 @@ def database():
                 # print(col)
                 properties = {}
 
-                print(col)
+                # print(col)
 
                 # print("Sum " + sum(the_tuple, ()))
                 # print(the_tuple.split(",")[1:len(the_tuple)-1])
@@ -189,14 +192,14 @@ def database():
                 # properties['geo'] = the_tuple[8]
 
                 feature = geojson.Feature(geometry=geojson.loads(geo), properties=properties)
-                print(properties)
+                # print(properties)
                 features.append(feature)
 
             collection = geojson.FeatureCollection(features)
             # return flask.jsonify(data)
             resp = flask.Response(geojson.dumps(collection), status=200, mimetype='application/json')
             return resp
-            #return flask.jsonify(data)
+            # return flask.jsonify(data)
 
         except psycopg2.DatabaseError as e:
             print("Uh oh, can't connect. Invalid dbname, user or password?")
@@ -207,13 +210,15 @@ def database():
 @app.route("/abfahrt/<code>", methods=['GET', 'POST'])
 @app.route("/abfahrt/")
 def api(code=None):
+    limit = flask.request.args.get('limit', default=None)
     if code is None:
         return flask.render_template("error.html", base=flask.request.base_url, path=flask.request.path,
                                      error="Bitte nutze <code>{{ base }}&lt;code&gt;/</code> um die Abfahrtszeiten zu bekommen",
                                      error_title="Error: Kein Code")
     else:
         req = flask.request
-        data = getdata(code)
+
+        data = getdata(code, limit)
         resp = flask.Response(data, status=200, mimetype='application/json')
         return flask.jsonify(data)
 
