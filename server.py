@@ -7,6 +7,7 @@ from io import StringIO
 import psycopg2
 import geojson
 import configparser
+import json
 
 app = flask.Flask(__name__)
 
@@ -143,6 +144,7 @@ def database():
             db = config.get("postgres", "db")
             user = config.get("postgres", "user")
             password = config.get("postgres", "password")
+            key = config.get("graphhopper","key")
 
 
             connect_str = "dbname=" + db + " user=" + user + " host=" + host + " " + \
@@ -166,7 +168,17 @@ def database():
             # print(rows)
             # print(sum(rows, ()))
             features = []
-
+            
+            start_geo=lat + "%2C" + long            
+            
+            for col in rows:
+                finish_geo=col[12][0] + "%2C" + col[12][1]
+                url="https://graphhopper.com/api/1/route?point=" + start_geo + "&point=" + finish_geo + "&vehicle=foot&instructions=false"+"&points_encoded=false&calc_points=false&locale=de&key=" + key
+                req = urllib.request.Request(url)
+                page = urllib.request.urlopen(req)
+                routing_json=json.load(page)    
+                rows.append(routing_json["paths"][0]["distance"])
+                rows.append(routing_json["paths"][0]["time"]/1000/60)
             # print(rows)
             # print(rows[0][0])
             for col in rows:
@@ -195,6 +207,8 @@ def database():
                 properties['stadtbez'] = col[7]
                 properties['hyperlink'] = col[8]
                 properties['distance'] = col[11]
+                properties['foot_distance'] = col [13]
+                properties['foot_time'] = col[14]
 
                 geo = col[12]
                 # properties['geo'] = the_tuple[8]
